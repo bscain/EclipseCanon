@@ -1,19 +1,14 @@
 import json
 import logging
-
 import os
 import shutil
-
 import time
 import urllib3
-import yaml
 
-# from email.message import EmailMessage
 from requests.utils import requote_uri
 from datetime import datetime, timedelta
 
 _logfile = "ccapi.log"
-
 
 class CCAPI(object):
     """
@@ -22,28 +17,38 @@ class CCAPI(object):
 
     # TODO hard Coded IP Address Still... Consider a Search
     def __init__(self, IPAddress = "192.168.1.172:8080", dryRun=False):
+        """
+        The initialization function.  Sets up the system logging and connection information
+        :param IPAddress:
+        :param dryRun:
+        """
         self._log = logging.getLogger()
         self._server = urllib3.PoolManager()
 
         self._IPAddress = IPAddress
         self._DryRun = dryRun
-    # AV Apeture Value
-    # TV Shutter Speed
-    # ISO
+
+    # end __init__
 
     def _convertFloat(self,
                       fraction: str) -> float:
+        """
+        Helper Function to convert a fraction string to the corresponding float value
+        :param fraction: 
+        :return: The float representation of the input string
+        """
+        try:
+            return float(fraction)
+        except ValueError:
+            num, denom = fraction.split('/')
             try:
-                return float(fraction)
+                leading, num = num.split(' ')
+                whole = float(leading)
             except ValueError:
-                num, denom = fraction.split('/')
-                try:
-                    leading, num = num.split(' ')
-                    whole = float(leading)
-                except ValueError:
-                    whole = 0
-                frac = float(num) / float(denom)
-                return whole - frac if whole < 0 else whole + frac
+                whole = 0
+            frac = float(num) / float(denom)
+            return whole - frac if whole < 0 else whole + frac
+    # end _convertToFloat
 
     def _GetCamera(self,
                    url: str,
@@ -51,6 +56,9 @@ class CCAPI(object):
                    retryDelay=0.1) -> dict:
         """
         Method to GET data from a given URL of a JSON Rest API.
+        :param url: The URL to GET
+        :param retryCount: The number of time to attempt to call the API before giving up
+        :param retryDelay: The number of seconds to delay between retry attempts
         :return:
         """
         headers = {}
@@ -81,6 +89,8 @@ class CCAPI(object):
         Method to Put data to the given URL of a JSON Rest API.
         :param url: The full url to POST data to
         :param data: The data to be posted
+        :param retryCount: The number of time to attempt to call the API before giving up
+        :param retryDelay: The number of seconds to delay between retry attempts
         :return: A boolean indicating if a status 200 was returned from the server indicating success
         """
         if self._server is None:
@@ -116,6 +126,8 @@ class CCAPI(object):
         Method to Put data to the given URL of a JSON Rest API.
         :param url: The full url to POST data to
         :param data: The data to be posted
+        :param retryCount: The number of time to attempt to call the API before giving up
+        :param retryDelay: The number of seconds to delay between retry attempts
         :return: A boolean indicating if a status 200 was returned from the server indicating success
         """
         if self._server is None:
@@ -146,9 +158,11 @@ class CCAPI(object):
                       retryCount=5,
                       retryDelay=0.1):
         """
-        TODO WRITE ME
-        :param url:
-        :return:
+        This function issues a DELETE request to the API
+        :param url: The URL to issue the DELETE on
+        :param retryCount: The number of time to attempt to call the API before giving up
+        :param retryDelay: The number of seconds to delay between retry attempts
+        :return: True is the DELETE status is 200, or None when an error occurs
         """
         headers = {}
         url = requote_uri(url)
@@ -169,7 +183,18 @@ class CCAPI(object):
         return retVal
     # end _DeleteCamera
 
-    def downloadFile(self, saveDirectory, remotePath, removeAfterDownload = False):
+    def downloadFile(self,
+                     saveDirectory,
+                     remotePath,
+                     removeAfterDownload = False):
+        """
+        Download the file from the Camera to the local machine, optionally deleting it from the camera when
+        download is complete.
+        :param saveDirectory: The directory where the file will be saved to
+        :param remotePath: The path on the camera storage card to download
+        :param removeAfterDownload: A boolean indicating if the file should be deleted from the camera
+        :return: None
+        """
 
         fileName = os.path.join(saveDirectory, remotePath.split('/')[-1])
         url = f"{self._IPAddress}{remotePath}"
@@ -181,14 +206,15 @@ class CCAPI(object):
         if removeAfterDownload:
             self._log.info(f"Removing Remote File: {remotePath}")
             self.deleteFile(remotePath)
+        # end if
+    # end downloadFile
 
     def deleteFile(self, remotePath):
         url = f"{self._IPAddress}{remotePath}"
         success = self._DeleteCamera(url)
 
         return success
-
-
+    # end deleteFile
 
     @property
     def av(self):

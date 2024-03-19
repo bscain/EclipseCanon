@@ -1,0 +1,54 @@
+# Time Values derived from: http://xjubier.free.fr/en/site_pages/solar_eclipses/TSE_2024_GoogleMapFull.html?Lat=32.20853&Lng=-96.05184&Elv=99.0&Zoom=11&LC=1
+# Exposures generated from: http://xjubier.free.fr/en/site_pages/SolarEclipseExposure.html
+
+CCAPI:
+  IPAddress: "192.168.1.172:8080"
+
+Eclipse:
+# Dallas Configuration for April 8th 2024
+  c1: "2024-04-08T17:23:21Z"
+  c2: "2024-04-08T18:41:07Z"
+  c3: "2024-04-08T18:44:52Z"
+  c4: "2024-04-08T20:03:13Z"
+  max: "2024-04-08T18:42:59Z"
+
+# Two Possible Values:  Walk and Camera Mode
+# When the Configuration is Walk, it uses the Walk configuration where the shutter speed and ISO walk up the tree
+# When the Configuration is Camera mode it loops through the Cameras using the ISO specified and shutter speeds
+# specified based on the item to be captured.
+Configuration: Walk
+
+# Configuration for F6.3
+Walk:
+  # When set to True, the files will be downloaded between shots, which may throw off the timing between
+  # the shots.
+  EnableDownload: True
+
+  # When EnableDownload is set to true, the files will be downloaded to this directory
+  DownloadDirectory: C:\eclipse\
+
+  # When set to true, the file is removed from the camera when successfully downloaded.
+  RemoveAfterDownload: True
+
+  # The Maximum ISO to utilize when walking the ISO / TV sequence during Totality
+  MaxISO: 800
+
+  # The Maximum Shutter speed (a.k.a. TV Value)
+  MaxShutter: 3"
+
+  # The Minimum Shutter speed (a.k.a. TV Value)
+  MinShutter: 1/8000
+
+  # The Target time to have between shots during C1
+  C1Delay: 30
+  C1ISO: 100
+  C1Shutter: 1/1250
+
+  BeadsISO: 100
+  BeadsShutter: 1/320
+  DiamondShutter: 1/60
+
+  # The Target time to have between shots during C1
+  C3Delay: 30
+  C3ISO: 100
+  C3Shutter: 1/1250

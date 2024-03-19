@@ -1,27 +1,17 @@
-
 import argparse
-import io
-import json
-import logging
-import os
-
 import datetime
+import io
+import logging
 import pause
 import yaml
 
-
 from CCAPI import CCAPI
-
-
-
-from dateutil import parser
 from datetime import datetime, timedelta, timezone
 
 class EclipseCanon(object):
 
     def __init__(self, config):
         self._log = logging.getLogger()
-
         self._config = config
 
         self._C1 = datetime.strptime(cfg['Eclipse']['c1'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
@@ -29,10 +19,21 @@ class EclipseCanon(object):
         self._C3 = datetime.strptime(cfg['Eclipse']['c3'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         self._C4 = datetime.strptime(cfg['Eclipse']['c4'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         self._Max = datetime.strptime(cfg['Eclipse']['max'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-
     # end __init__
 
+    def _EnableDebugMode(self):
+        """
+        A function to overwrite the configured time using relative times instead of absolute from the configuration
+        :return:
+        """
+        now = datetime.now(timezone.utc)
+        self._C1 = now + timedelta(seconds=10)
+        self._C2 = self._C1 + timedelta(hours=1, minutes=23)
+        self._C3 = self._C2 + timedelta(minutes=3, seconds=58)
+        self._C4 = self._C3 + timedelta(hours=1, minutes=23)
+
     def getPhase(self):
+        #TODO CONSIDER TIME AFTER C3
         now = datetime.now(timezone.utc)
         tC2 = self._C2 - now
         retVal = None
@@ -55,7 +56,6 @@ class EclipseCanon(object):
 
     def getWakeTime(self):
         """
-        TODO DOES NOT ACCOUNT FOR CONFIGURED WAKE TIME
         :return:
         """
         now = datetime.now(timezone.utc)
@@ -65,13 +65,13 @@ class EclipseCanon(object):
             wake = self._C1
         elif now > self._C1 and now < self._C2 and tC2.seconds > 17:
             # In C1 with more than 17 seconds to C2, sleep for 6 seconds
-            wake = datetime.now() + timedelta(seconds=15)
+            wake = datetime.now() + timedelta(seconds=self._config['Walk']['C1Delay'])
         elif now > self._C1 and tC2.seconds < 17:
             # If we are within 17 seconds of C2, wake 10 seconds before it
             wake = self._C2 + timedelta(seconds=-10)
         elif now > self._C3:
             # If we are within C3, sleep for 6 seconds
-            wake = datetime.now() + timedelta(seconds=15)
+            wake = datetime.now() + timedelta(seconds=self._config['Walk']['C3Delay'])
 
         return wake
     # end getWakeTime
@@ -142,6 +142,8 @@ if __name__ == "__main__":
     cfg = parseConfig(args.configuration)
 
     ec = EclipseCanon(config=cfg)
+    ec._EnableDebugMode()
+
     ccapi = None
 
     if 'CCAPI' not in cfg:
@@ -149,7 +151,7 @@ if __name__ == "__main__":
     elif 'IPAddress' not in cfg['CCAPI']:
         log.error("Missing IPAddress in CCAPI Configuration Section")
     else:
-        ccapi = CCAPI(IPAddress=cfg['CCAPI']['IPAddress'], dryRun=True)
+        ccapi = CCAPI(IPAddress=cfg['CCAPI']['IPAddress'], dryRun=False)
 
     if "Configuration" not in cfg:
         log.error("Missing Configuration setting from configuration file")
@@ -159,6 +161,7 @@ if __name__ == "__main__":
             wake = ec.getWakeTime()
             log.info(f"Waiting for C1 at {wake}")
             pause.until(wake)
+
         ##################################
         # C1 Settings
         ##################################
@@ -196,9 +199,9 @@ if __name__ == "__main__":
 
             photos = 0
             for iso in isos:
-                # ccapi.iso = iso
+                ccapi.iso = iso
                 for tv in tvs:
-                    # ccapi.tv = tv
+                    ccapi.tv = tv
                     log.info(f"Capturing Totality at {datetime.now()} with Setting TV: {tv}   ISO: {iso}")
                     ccapi.shoot(af=False)
                     photos += 1
@@ -224,16 +227,25 @@ if __name__ == "__main__":
         while ec.getPhase() == "C3":
             log.info(f"Capturing C3 at {datetime.now()}")
             ccapi.shoot(af=False)
+            if cfg['Walk']['EnableDownload']:
+                # Attemps to download the last two photos that were taken.
+                files = ccapi.getDeviceStorage()[:2]
+                for f in files:
+                    log.info(f"Downloading {f}")
+                    ccapi.downloadFile(saveDirectory=cfg['Walk']['DownloadDirectory'],
+                                       remotePath=f,
+                                       removeAfterDownload=cfg['Walk']['RemoveAfterDownload'])
             pause.until(ec.getWakeTime())
 
         # If Enable Download turned on, download the rest of the files that have not had
         # the opportunity to be pulled off the camera
         if cfg['Walk']['EnableDownload']:
-            # Attemps to download the last two photos that were taken.
             files = ccapi.getDeviceStorage()
             for f in files:
+                log.info(f"Downloading {f}")
                 ccapi.downloadFile(saveDirectory=cfg['Walk']['DownloadDirectory'],
-                                   remotePath=f)
+                                   remotePath=f,
+                                   removeAfterDownload=cfg['Walk']['RemoveAfterDownload'])
 
     elif cfg['Configuration'] == "Cameras":
         log.info("Cameras Configuration")
